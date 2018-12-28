@@ -120,6 +120,7 @@ def main():
     parser.add_option("-o", "--out", dest="out_file", help="Path to out file (A default is chosen if not given).")
     parser.add_option("-t", "--train", dest="t", help="desired number of train images")
     parser.add_option("-b", "--base", dest="base_path", help="images_base_path")
+    parser.add_option("-c", "--override_class", dest="ov_cls", help="override class assigment")
     (options, args) = parser.parse_args()
 
     # Obtain first image dims
@@ -140,6 +141,9 @@ def main():
         new_classes = {k: str(int(k) + 1) for k in classes}
     else:
         new_classes = {k: str(int(k)) for k in classes}
+
+    if options.ov_cls:
+        new_classes = {k: '1' for k in classes}
 
     # Check output folders
     base_train = os.path.join(options.base_path, 'TRAIN')
