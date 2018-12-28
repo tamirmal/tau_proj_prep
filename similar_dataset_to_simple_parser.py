@@ -28,6 +28,7 @@ IMG_W = 0
 # Classes
 classes = []
 new_classes = {}
+yolo_classes = {}
 
 # format :
 # IMG_20181226_180026.txt:
@@ -87,6 +88,7 @@ def format_for_simple_parser(outf, entries, base_path):
     if os.path.isfile(outf):
         assert 0
 
+    print("class mappings : {}".format(str(new_classes)))
     class_balance = {val: 0 for k, val in new_classes.items()}
 
     with open(outf, 'w') as of:
@@ -123,7 +125,8 @@ def format_for_yolo(outf, entries, base_path):
     if os.path.isfile(outf):
         assert 0
 
-    class_balance = {val: 0 for k, val in new_classes.items()}
+    print("class mappings : {}".format(str(yolo_classes)))
+    class_balance = {val: 0 for k, val in yolo_classes.items()}
 
     with open(outf, 'w') as of:
         for entry in entries:
@@ -140,7 +143,7 @@ def format_for_yolo(outf, entries, base_path):
 
                 x1, x2 = int(X_C - W/2), int(X_C + W/2)
                 y1, y2 = int(Y_C - H/2), int(Y_C + H/2)
-                cls = new_classes[CLS]
+                cls = yolo_classes[CLS]
                 class_balance[cls] = class_balance[cls] + 1
 
                 box = " {},{},{},{},{}".format(x1, y1, x2, y2, cls)
@@ -185,12 +188,19 @@ def main():
     shuffle(all_img_bbox)
 
     # remap classes - this will make class num 0 go away
+    # faster rcnn classes starts from 1
     global new_classes
     global classes
     if '0' in classes:
         new_classes = {k: str(int(k) + 1) for k in classes}
     else:
         new_classes = {k: str(int(k)) for k in classes}
+
+    # yolo classes starts from 0
+    global yolo_classes
+    yolo_classes = new_classes
+    if '0' not in classes:
+        yolo_classes = {k: str(int(k) - 1) for k in classes}
 
     # Check output folders
     base_train = os.path.join(options.base_path, 'TRAIN')
@@ -216,12 +226,13 @@ def main():
 
     if options.ov_cls:
         new_classes = {k: '1' for k in classes}
+        yolo_classes = {k: '0' for k in classes}
         # simple parser (faster rcnn)
         format_for_simple_parser(options.out_file + 'Single.train', all_img_bbox[:test_idx], base_train)
         format_for_simple_parser(options.out_file + 'Single.test', all_img_bbox[test_idx:], base_test)
         # yolo v3
-        format_for_yolo(options.out_file + '.yolo_train', all_img_bbox[:test_idx], base_train)
-        format_for_yolo(options.out_file + '.yolo_test', all_img_bbox[test_idx:], base_test)
+        format_for_yolo(options.out_file + '.Singleyolo_train', all_img_bbox[:test_idx], base_train)
+        format_for_yolo(options.out_file + '.Singleyolo_test', all_img_bbox[test_idx:], base_test)
 
     write_img_list('train.list', all_img_bbox[:test_idx])
     write_img_list('test.list', all_img_bbox[test_idx:])
