@@ -217,8 +217,8 @@ def main():
     if options.ov_cls:
         new_classes = {k: '1' for k in classes}
         # simple parser (faster rcnn)
-        format_for_simple_parser(options.out_file + '.train', all_img_bbox[:test_idx], base_train)
-        format_for_simple_parser(options.out_file + '.test', all_img_bbox[test_idx:], base_test)
+        format_for_simple_parser(options.out_file + 'Single.train', all_img_bbox[:test_idx], base_train)
+        format_for_simple_parser(options.out_file + 'Single.test', all_img_bbox[test_idx:], base_test)
         # yolo v3
         format_for_yolo(options.out_file + '.yolo_train', all_img_bbox[:test_idx], base_train)
         format_for_yolo(options.out_file + '.yolo_test', all_img_bbox[test_idx:], base_test)
