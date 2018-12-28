@@ -128,8 +128,8 @@ def format_for_yolo(outf, entries, base_path):
     with open(outf, 'w') as of:
         for entry in entries:
             im_path = os.path.join(base_path, entry['imgname'])
-
             line = im_path
+
             for box in entry['data']:
                 X_C, Y_C = box[LIST_ENUMS.X_C.value], box[LIST_ENUMS.Y_C.value]
                 W, H = box[LIST_ENUMS.W.value], box[LIST_ENUMS.H.value]
@@ -146,11 +146,22 @@ def format_for_yolo(outf, entries, base_path):
                 box = " {},{},{},{},{}".format(x1, y1, x2, y2, cls)
                 line = line + box
 
+            line += '\n'
             logging.debug(line)
             of.write(line)
 
     print("outf : {} - class balance = {}".format(outf, str(class_balance)))
     # End
+
+
+def write_img_list(outf, entries):
+    if os.path.isfile(outf):
+        assert 0
+
+    with open(outf, 'w') as of:
+        for entry in entries:
+            im_path = os.path.join(entry['imgname']) + '\n'
+            of.write(im_path)
 
 
 def main():
@@ -181,9 +192,6 @@ def main():
     else:
         new_classes = {k: str(int(k)) for k in classes}
 
-    if options.ov_cls:
-        new_classes = {k: '1' for k in classes}
-
     # Check output folders
     base_train = os.path.join(options.base_path, 'TRAIN')
     base_test = os.path.join(options.base_path, 'TRAIN')
@@ -203,8 +211,20 @@ def main():
     format_for_simple_parser(options.out_file + '.train', all_img_bbox[:test_idx], base_train)
     format_for_simple_parser(options.out_file + '.test', all_img_bbox[test_idx:], base_test)
     # yolo v3
-    format_for_simple_parser(options.out_file + '.yolo_train', all_img_bbox[:test_idx], base_train)
-    format_for_simple_parser(options.out_file + '.yolo_test', all_img_bbox[test_idx:], base_test)
+    format_for_yolo(options.out_file + '.yolo_train', all_img_bbox[:test_idx], base_train)
+    format_for_yolo(options.out_file + '.yolo_test', all_img_bbox[test_idx:], base_test)
+
+    if options.ov_cls:
+        new_classes = {k: '1' for k in classes}
+        # simple parser (faster rcnn)
+        format_for_simple_parser(options.out_file + '.train', all_img_bbox[:test_idx], base_train)
+        format_for_simple_parser(options.out_file + '.test', all_img_bbox[test_idx:], base_test)
+        # yolo v3
+        format_for_yolo(options.out_file + '.yolo_train', all_img_bbox[:test_idx], base_train)
+        format_for_yolo(options.out_file + '.yolo_test', all_img_bbox[test_idx:], base_test)
+
+    write_img_list('train.list', all_img_bbox[:test_idx])
+    write_img_list('test.list', all_img_bbox[test_idx:])
 
 
 if __name__ == "__main__":
