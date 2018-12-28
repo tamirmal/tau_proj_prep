@@ -114,6 +114,45 @@ def format_for_simple_parser(outf, entries, base_path):
     # End
 
 
+def format_for_yolo(outf, entries, base_path):
+    """
+    Output :
+    /data/imgs/img_001.jpg,837,346,981,456,cow 215,312,279,391,cat
+    /data/imgs/img_002.jpg,215,312,279,391,cat
+    """
+    if os.path.isfile(outf):
+        assert 0
+
+    class_balance = {val: 0 for k, val in new_classes.items()}
+
+    with open(outf, 'w') as of:
+        for entry in entries:
+            im_path = os.path.join(base_path, entry['imgname'])
+
+            line = im_path
+            for box in entry['data']:
+                X_C, Y_C = box[LIST_ENUMS.X_C.value], box[LIST_ENUMS.Y_C.value]
+                W, H = box[LIST_ENUMS.W.value], box[LIST_ENUMS.H.value]
+                CLS = box[LIST_ENUMS.CLS.value]
+
+                X_C, Y_C = float(X_C) * IMG_W, float(Y_C) * IMG_H
+                W, H = float(W) * IMG_W, float(H) * IMG_H
+
+                x1, x2 = int(X_C - W/2), int(X_C + W/2)
+                y1, y2 = int(Y_C - H/2), int(Y_C + H/2)
+                cls = new_classes[CLS]
+                class_balance[cls] = class_balance[cls] + 1
+
+                box = " {},{},{},{},{}".format(x1, y1, x2, y2, cls)
+                line = line + box
+
+            logging.debug(line)
+            of.write(line)
+
+    print("outf : {} - class balance = {}".format(outf, str(class_balance)))
+    # End
+
+
 def main():
     parser = OptionParser()
     parser.add_option("-p", "--path", dest="p", help="Path to input file.")
@@ -160,8 +199,12 @@ def main():
     # Do work ...
     test_idx = int(options.t)
     assert (test_idx < len(all_img_bbox))
+    # simple parser (faster rcnn)
     format_for_simple_parser(options.out_file + '.train', all_img_bbox[:test_idx], base_train)
     format_for_simple_parser(options.out_file + '.test', all_img_bbox[test_idx:], base_test)
+    # yolo v3
+    format_for_simple_parser(options.out_file + '.yolo_train', all_img_bbox[:test_idx], base_train)
+    format_for_simple_parser(options.out_file + '.yolo_test', all_img_bbox[test_idx:], base_test)
 
 
 if __name__ == "__main__":
