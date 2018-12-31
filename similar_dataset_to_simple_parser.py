@@ -43,7 +43,7 @@ def process_file_single(filename, base):
         'imgname': None,
         'data': []
     }
-
+    global classes
     boxex = []
     imgname = filename.split('.')[-2] + '.jpg'
     entry['imgname'] = imgname
@@ -200,12 +200,11 @@ def main():
     all_img_bbox = process_files(options.p)
     shuffle(all_img_bbox)
 
-
+    global classes
     print("known classes from inputs : {}".format(str(classes)))
 
     # remap classes - this will make class num 0 go away
     # faster rcnn classes starts from 1
-    global classes
     global one_based_classes, zero_based_classes
     if '0' in classes:
         one_based_classes = {k: str(int(k) + 1) for k in classes}
@@ -215,8 +214,8 @@ def main():
         zero_based_classes = {k: str(int(k) - 1) for k in classes}
 
     # Check output folders
-    base_train = os.path.join(options.base_path, 'TRAIN')
-    base_test = os.path.join(options.base_path, 'TRAIN')
+    base_train = os.path.join(options.base_path)
+    base_test = os.path.join(options.base_path)
 
     # Do work ...
     test_idx = int(options.t)
@@ -224,10 +223,16 @@ def main():
     assert (test_idx < len(all_img_bbox))
     # simple parser (faster rcnn)
     format_for_simple_parser(options.out_file + '_train.txt', all_img_bbox[:test_idx], base_train)
-    format_for_simple_parser(options.out_file + '_test', all_img_bbox[test_idx:], base_test)
+    format_for_simple_parser(options.out_file + '_test.txt', all_img_bbox[test_idx:], base_test)
     # yolo v3
-    format_for_yolo(options.out_file + '_yolo_train.txt', all_img_bbox[:test_idx], base_train)
-    format_for_yolo(options.out_file + '_yolo_test', all_img_bbox[test_idx:], base_test)
+    format_for_yolo(options.out_file + '_yolo_train_zero_based.txt', all_img_bbox[:test_idx], base_train)
+    format_for_yolo(options.out_file + '_yolo_test_zero_based.txt', all_img_bbox[test_idx:], base_test)
+
+    tmp = zero_based_classes
+    zero_based_classes = one_based_classes
+    format_for_yolo(options.out_file + '_yolo_train_one_based.txt', all_img_bbox[:test_idx], base_train)
+    format_for_yolo(options.out_file + '_yolo_test_one_based.txt', all_img_bbox[test_idx:], base_test)
+    zero_based_classes = tmp
 
     if options.ov_cls:
         tmp = None
@@ -236,18 +241,18 @@ def main():
         # simple parser (faster rcnn)
         tmp = one_based_classes
         one_based_classes = single_one_based_classes
-        one_based_classes = tmp
         format_for_simple_parser(options.out_file + '_Single_train.txt', all_img_bbox[:test_idx], base_train)
         format_for_simple_parser(options.out_file + '_Single_test.txt', all_img_bbox[test_idx:], base_test)
+        one_based_classes = tmp
         # yolo v3
         tmp = single_zero_based_classes
         zero_based_classes = single_zero_based_classes
+        format_for_yolo(options.out_file + '_Singleyolo_train_zero_based.txt', all_img_bbox[:test_idx], base_train)
+        format_for_yolo(options.out_file + '_Singleyolo_test_zero_based.txt', all_img_bbox[test_idx:], base_test)
         zero_based_classes = tmp
-        format_for_yolo(options.out_file + '_Singleyolo_train.txt', all_img_bbox[:test_idx], base_train)
-        format_for_yolo(options.out_file + '_Singleyolo_test.txt', all_img_bbox[test_idx:], base_test)
 
-    write_img_list('_train_list.txt', all_img_bbox[:test_idx])
-    write_img_list('_test_list.txt', all_img_bbox[test_idx:])
+    write_img_list(options.out_file + '_train_list.txt', all_img_bbox[:test_idx])
+    write_img_list(options.out_file + '_test_list.txt', all_img_bbox[test_idx:])
 
 
 if __name__ == "__main__":
