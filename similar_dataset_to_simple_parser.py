@@ -2,7 +2,7 @@ import sys
 from collections import OrderedDict
 import numpy as np
 import os
-import ipdb
+#import ipdb
 from optparse import OptionParser
 import csv
 import logging
@@ -27,8 +27,10 @@ IMG_W = 0
 
 # Classes
 classes = []
-new_classes = {}
-yolo_classes = {}
+zero_based_classes = {}
+one_based_classes = {}
+single_one_based_classes = {}
+single_zero_based_classes = {}
 
 # format :
 # IMG_20181226_180026.txt:
@@ -84,12 +86,16 @@ def format_for_simple_parser(outf, entries, base_path):
     /data/imgs/img_001.jpg,837,346,981,456,cow
     /data/imgs/img_002.jpg,215,312,279,391,cat
     """
+    print("==================================================")
+    print("format for simple parser : outf {}".format(outf))
 
     if os.path.isfile(outf):
         assert 0
 
-    print("class mappings : {}".format(str(new_classes)))
-    class_balance = {val: 0 for k, val in new_classes.items()}
+    global one_based_classes
+
+    print("one bases classes : {}".format(str(one_based_classes)))
+    class_balance = {val: 0 for k, val in one_based_classes.items()}
 
     with open(outf, 'w') as of:
         for entry in entries:
@@ -105,7 +111,7 @@ def format_for_simple_parser(outf, entries, base_path):
 
                 x1, x2 = int(X_C - W/2), int(X_C + W/2)
                 y1, y2 = int(Y_C - H/2), int(Y_C + H/2)
-                cls = new_classes[CLS]
+                cls = one_based_classes[CLS]
                 class_balance[cls] = class_balance[cls] + 1
 
                 line = "{},{},{},{},{},{}\n".format(im_path, x1, y1, x2, y2, cls)
@@ -113,20 +119,26 @@ def format_for_simple_parser(outf, entries, base_path):
                 of.write(line)
 
     print("outf : {} - class balance = {}".format(outf, str(class_balance)))
+    print("==================================================")
     # End
 
 
 def format_for_yolo(outf, entries, base_path):
     """
     Output :
-    /data/imgs/img_001.jpg,837,346,981,456,cow 215,312,279,391,cat
-    /data/imgs/img_002.jpg,215,312,279,391,cat
+    /data/imgs/img_001.jpg,837,346,981,456,0 215,312,279,391,1
+    /data/imgs/img_002.jpg,215,312,279,391,0
     """
     if os.path.isfile(outf):
         assert 0
 
-    print("class mappings : {}".format(str(yolo_classes)))
-    class_balance = {val: 0 for k, val in yolo_classes.items()}
+    print("==================================================")
+    print("format for yolo : outf {}".format(outf))
+
+    global zero_based_classes
+
+    print("zero bases classes : {}".format(str(zero_based_classes)))
+    class_balance = {val: 0 for k, val in zero_based_classes.items()}
 
     with open(outf, 'w') as of:
         for entry in entries:
@@ -143,7 +155,7 @@ def format_for_yolo(outf, entries, base_path):
 
                 x1, x2 = int(X_C - W/2), int(X_C + W/2)
                 y1, y2 = int(Y_C - H/2), int(Y_C + H/2)
-                cls = yolo_classes[CLS]
+                cls = zero_based_classes[CLS]
                 class_balance[cls] = class_balance[cls] + 1
 
                 box = " {},{},{},{},{}".format(x1, y1, x2, y2, cls)
@@ -154,6 +166,7 @@ def format_for_yolo(outf, entries, base_path):
             of.write(line)
 
     print("outf : {} - class balance = {}".format(outf, str(class_balance)))
+    print("==================================================")
     # End
 
 
@@ -173,7 +186,7 @@ def main():
     parser.add_option("-o", "--out", dest="out_file", help="Path to out file (A default is chosen if not given).")
     parser.add_option("-t", "--train", dest="t", help="desired number of train images")
     parser.add_option("-b", "--base", dest="base_path", help="images_base_path")
-    parser.add_option("-c", "--override_class", dest="ov_cls", help="override class assigment")
+    parser.add_option("-c", "--override_class", dest="ov_cls", help="override class assigment", default=True)
     (options, args) = parser.parse_args()
 
     # Obtain first image dims
@@ -187,55 +200,54 @@ def main():
     all_img_bbox = process_files(options.p)
     shuffle(all_img_bbox)
 
+
+    print("known classes from inputs : {}".format(str(classes)))
+
     # remap classes - this will make class num 0 go away
     # faster rcnn classes starts from 1
-    global new_classes
     global classes
+    global one_based_classes, zero_based_classes
     if '0' in classes:
-        new_classes = {k: str(int(k) + 1) for k in classes}
+        one_based_classes = {k: str(int(k) + 1) for k in classes}
+        zero_based_classes = {k: str(k) for k in classes}
     else:
-        new_classes = {k: str(int(k)) for k in classes}
-
-    # yolo classes starts from 0
-    global yolo_classes
-    yolo_classes = new_classes
-    if '0' not in classes:
-        yolo_classes = {k: str(int(k) - 1) for k in classes}
+        one_based_classes = {k: str(int(k)) for k in classes}
+        zero_based_classes = {k: str(int(k) - 1) for k in classes}
 
     # Check output folders
     base_train = os.path.join(options.base_path, 'TRAIN')
     base_test = os.path.join(options.base_path, 'TRAIN')
-    """
-    if any(os.path.isdir(bb) for bb in [base_train, base_test]):
-        print("TRAIN or TEST folders already exists!")
-        assert 0
-
-    os.mkdir(base_test)
-    os.mkdir(base_train)
-    """
 
     # Do work ...
     test_idx = int(options.t)
+    print("unsing {} photos for training".format(test_idx))
     assert (test_idx < len(all_img_bbox))
     # simple parser (faster rcnn)
-    format_for_simple_parser(options.out_file + '.train', all_img_bbox[:test_idx], base_train)
-    format_for_simple_parser(options.out_file + '.test', all_img_bbox[test_idx:], base_test)
+    format_for_simple_parser(options.out_file + '_train.txt', all_img_bbox[:test_idx], base_train)
+    format_for_simple_parser(options.out_file + '_test', all_img_bbox[test_idx:], base_test)
     # yolo v3
-    format_for_yolo(options.out_file + '.yolo_train', all_img_bbox[:test_idx], base_train)
-    format_for_yolo(options.out_file + '.yolo_test', all_img_bbox[test_idx:], base_test)
+    format_for_yolo(options.out_file + '_yolo_train.txt', all_img_bbox[:test_idx], base_train)
+    format_for_yolo(options.out_file + '_yolo_test', all_img_bbox[test_idx:], base_test)
 
     if options.ov_cls:
-        new_classes = {k: '1' for k in classes}
-        yolo_classes = {k: '0' for k in classes}
+        tmp = None
+        single_one_based_classes = {k: '1' for k in classes}
+        single_zero_based_classes = {k: '0' for k in classes}
         # simple parser (faster rcnn)
-        format_for_simple_parser(options.out_file + 'Single.train', all_img_bbox[:test_idx], base_train)
-        format_for_simple_parser(options.out_file + 'Single.test', all_img_bbox[test_idx:], base_test)
+        tmp = one_based_classes
+        one_based_classes = single_one_based_classes
+        one_based_classes = tmp
+        format_for_simple_parser(options.out_file + '_Single_train.txt', all_img_bbox[:test_idx], base_train)
+        format_for_simple_parser(options.out_file + '_Single_test.txt', all_img_bbox[test_idx:], base_test)
         # yolo v3
-        format_for_yolo(options.out_file + '.Singleyolo_train', all_img_bbox[:test_idx], base_train)
-        format_for_yolo(options.out_file + '.Singleyolo_test', all_img_bbox[test_idx:], base_test)
+        tmp = single_zero_based_classes
+        zero_based_classes = single_zero_based_classes
+        zero_based_classes = tmp
+        format_for_yolo(options.out_file + '_Singleyolo_train.txt', all_img_bbox[:test_idx], base_train)
+        format_for_yolo(options.out_file + '_Singleyolo_test.txt', all_img_bbox[test_idx:], base_test)
 
-    write_img_list('train.list', all_img_bbox[:test_idx])
-    write_img_list('test.list', all_img_bbox[test_idx:])
+    write_img_list('_train_list.txt', all_img_bbox[:test_idx])
+    write_img_list('_test_list.txt', all_img_bbox[test_idx:])
 
 
 if __name__ == "__main__":
